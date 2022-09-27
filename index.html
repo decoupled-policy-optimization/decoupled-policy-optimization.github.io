@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="author" content="Minghuan Liu">
+  <meta name="description" content="How to model and generalize the high-level planning mode?">
+  <meta name="keywords" content="Minghuan Liu, demo, imitation, transfer, reinforcement, learning">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="images/apexrl.png">
+  <link rel="stylesheet" href="css/base.css">
+  <title>Plan Your Target and Learn Your Skills: Transferable State-Only Imitation Learning via Decoupled Policy Optimization</title>
+  <!-- google search console -->
+  <meta name="google-site-verification" content="x5sEDA0ieF_mVCYDKxJ820Xi1O6n_XqI8UrNO97RvXw" />
+
+  <!-- twitter -->
+  <article class="post-content">
+    <meta name="twitter:title" content="Decoupled Policy Optimization"/>
+    <meta name="twitter:card" content="summary_large_image" />
+    <!-- <meta name="twitter:image" content="https://xxx.png"/> -->
+  <article class="post-content">
+</head>
+
+<body>
+
+<div class="title">
+  Plan Your Target and Learn Your Skills: Transferable State-Only Imitation Learning via Decoupled Policy Optimization
+</div>
+<center>
+  <div class="authors">
+    <a href="https://minghuanliu.com/">Minghuan Liu</a>,
+    Zhengbang Zhu, 
+    Yuzheng Zhuang, 
+    <a href="https://wnzhang.net/">Weinan Zhang</a>, 
+    Jianye Hao, 
+    Yong Yu, 
+    Jun Wang
+  </div>
+  <div style="font-weight:bold">
+    Shanghai Jiao Tong University, <a href="https://github.com/apexrl/">Apex RL Group</a>
+  </div>
+
+<span class="venue tap_targets"><a href="https://icml.cc/Conferences/2022">ICML 2022</a></span>
+<span class="tag tap_targets">
+  <a href="https://arxiv.org/abs/2203.02214">Paper</a>&nbsp;
+  <a href="https://github.com/apexrl/DePO">Code</a>&nbsp;
+  <a href="files/bib.txt">Bibtex</a>
+</span>
+</center>
+<br>
+
+<div class="header">Summary</div>
+<p>
+  We propose a decouple policy structure and corresponding optimization method named Decoupled Policy Optimization (DePO). DePO explicitly decouples the policy as a high-level state planner and an inverse dynamics model, enables knowledge transfer and generalize the planner to different action spaces or state transition dynamics. Our experiments apply DePO in state-only imitation learning problems and reinforcement learning tasks, showing the effectiveness of DePO on learning a generalized state planner while achieving the best imitation performance, and can be transferred to train agents with different action spaces and action dynamics with much higher efficiency. We demonstrate the appealing usage of DePO for transferring across different tasks by pre-training, and the potential for co-training agents with various skills.
+</p>
+
+<center>
+  <img class="model" width=80% height=auto src="images/depo.png">
+  <p style="font-weight:bold">
+    How to model and generalize the high-level planning mode?
+    How to transfer such an ability?
+  </p>
+  <p>
+  A state-to-action policy is ad-hoc to the action space and dynamics. 
+  Hard to transfer! 
+  </p>
+  <p style="font-weight:bold">
+  We need a transferable policy structure.
+  </p>
+</center>
+
+<div class="header">Notations</div>
+  <p>
+    Before introducing the work, let's have some notation in an MDP first.
+    Consider a \(\gamma\)-discounted infinite horizon Markov decision process (MDP) \(\mathcal{M} = \langle \mathcal{S}, \mathcal{A}, \mathcal{T}, \rho_0, r, \gamma \rangle\), where \(\mathcal{S}\) is the set of states, \(\mathcal{A}\) is the action space, \(\mathcal{T}: \mathcal{S} \times \mathcal{A} \rightarrow \Delta(\mathcal{S})\) is the environment dynamics distribution, \(\rho_0 \rightarrow \Delta(\mathcal{S})\) is the initial state distribution, and \(\gamma\in [0,1]\) is the discount factor. The agent makes decisions through a policy \(\pi(a|s): \mathcal{S} \rightarrow \Delta(\mathcal{A})\) and receives rewards \(r: \mathcal{S} \times \mathcal{A} \rightarrow \mathbb{R}\).
+    In our paper, we assume deterministic environment dynamics \(\mathcal{T}\) such that \(s' = \mathcal{T}(s,a)\).
+  </p>
+
+<div class="header">Decouple the Policy</div>
+  <p>
+    Ok, let's see how a decoupled policy works!
+    Formally, the policy can be decoupled as two terms:
+    $$\pi = \underbrace{\mathcal{T}^{-1}_{\pi}}_{\text{inverse dynamics}}(\underbrace{\mathcal{T}(\pi)}_{\text{state planner}})~.$$
+    More rigorously, the decoupled function is:
+    $$
+    \begin{eqnarray} 
+    \pi(a|s) &= \int_{s'} \mathcal{T}(s'|s,a)\pi(a|s)\mathop{}\!\mathrm{d} s'\\
+      &= \int_{s'} \frac{\rho_{\pi}(s,s')I_{\pi}(a|s,s')}{\rho_{\pi}(s)}\mathop{}\!\mathrm{d} s'\\
+      &= \int_{s'} h_{\pi}(s'|s) I_{\pi}(a|s,s')\mathop{}\!\mathrm{d} s'~,
+    \end{eqnarray}$$
+    where \(h\) denotes a state planner, and \(I\) a inverse dynamics model. Both are policy dependent. Now, we have a depoupled policy stucture! But how to train it (them)?
+  </p> 
+
+<div class="header">Train the Decoupled Policy</div>
+First let's consider each part seperately.
+
+<div class="sub_header">Train the Inverse Dynamics</div>
+The only way to train the inverse dynamics model is supervised learning from agent experiences.
+  <p>
+    $$\newcommand{\fd}{\text{D}_{\text{f}}} \min_{\psi}L^{I} = \mathbb{E}_{(s,s')\sim\pi_{\mathcal{B}}}[\fd( I_{\pi_{\mathcal{B}}}(a|s,s')\| I_{\phi}(a|s,s'))]~.$$
+    In the equation, \( \pi_{\mathcal{B}} \) denotes a sampling policy. Actually, when the dynamics function is deterministic, different policies can share a unified and global inverse dynamics function. Therefore, we can train the function using all data collected during training.
+  </p>
+
+<div class="sub_header">Train the State Planner - Way 1: Supvervised Learning from Optimal Dataset</div>
+  <p>
+    The state planner can also be optimized via supervised learning if we have optimal (expert) data transition, e.g., when performing imitation learning tasks (\(h_{E}\) denotes the state planner of the optimal policies).
+
+  $$\min_{\psi}L^{h} = \mathbb{E}_{(s,s')\sim E}[\fd( h_{E}(s'|s)\| h_{\psi}(s'|s))]~.$$
+
+  However, it is well known that simply supervised learning in imitation learning can cause compouding error problem, and also, we should consider how to optimize when we have no access to expert demonstrations. Therefore, we should derive a way to utilizing <b>rewards</b>.
+  </p>
+
+<div class="sub_header">Train the State Planner - Way 2: Decoupled Policy Gradient using Rewards</div>
+  <p>
+  A direct idea come to our head, the state planner and the inverse dynamics can be seen as an integral policy function, whose input is state, and output is action, then why not use policy gradient on this two term directly?
+  <br>
+  <br>
+  Quickly, we realize that if we want to optimzie the state planner, we must fixed the inverse dynamics function to make the optimization meaningful; otherwise, if two modules are optimized by policy gradient at the same time, we have no guarantee that these two functions are actually serving as the function that we want!
+
+  In this case, when we compute the policy gradient over decoupled policy, we can write it as:
+  $$
+  \newcommand{\dif}{\mathop{}\!\mathrm{d}}
+  \begin{eqnarray}
+  \nabla_{\phi, \psi} \mathcal{L}^\pi = \mathbb{E}_{(s,a)\sim\pi}\left [Q(s,a)\nabla_{\phi,\psi}\log{\pi_{\phi,\psi}(a|s)}\right ] 
+      = \mathbb{E}_{(s,a)\sim\pi}\Big[\frac{Q(s,a)}{\pi(a|s)}\Big(\int_{s'}I(a|s,s')\nabla_{\psi}h_{\psi}(s'|s)\dif s'  +\mathbb{E}_{s'\sim h}\left [\nabla_{\phi}I_{\phi}(a|s,s')\right ]\Big)\Big]~.
+    \end{eqnarray}
+  $$
+  This simply expands the policy gradient into the decoupled function. 
+  For simplicity, we can also rewrite the deoupled policy with the reparameterization trick and bypass explicitly computing the integral over $s'$, as:
+  $$
+  s' = h(\epsilon;s), ~~
+      \pi(a|s)=\mathbb{E}_{\epsilon\sim \mathcal{N}}\left [ I(a|s,h(\epsilon;s)) \right ]~,
+  $$
+  where \(\epsilon\) is an input noise vector sampled from some fixed distribution, like a Gaussian. 
+  In this form, we rewrite the <b>decoupled policy gradient (DePG)</b> as:
+  $$
+  \begin{eqnarray}
+  \nabla_{\psi} \mathcal{L}^\pi
+          = \mathbb{E}_{(s,a)\sim\pi,\epsilon\sim\mathcal{N}}\left [\frac{Q(s,a)}{\pi(a|s)} \big(\nabla_{h}I(a|s,h_\psi(\epsilon;s))\nabla_{\psi}h_{\psi}(\epsilon;s)\big)\right ]~.
+  \end{eqnarray}
+  $$
+  Now let's try to understand what the DePG is doing. By fixing the inverse dynamics function, we are taking the knowledge from the inverse dynamics about action \(a\) to update parameters of the state planner by updating the prediction about the next state with error \(\Delta s' = \alpha \nabla_{h}I(a|s,h(\epsilon;s))\) and learning rate \(\alpha\)!
+  </p>
+
+<div class="sub_header">Train the State Planner - Way 2.1: Is Decoupled Policy Gradient Enough?</div>
+  <p>
+    Seems utizling the DePG we can train a state planner! But is it that easy to do?
+    <br>
+    We learn the decoupled policy on a simple grid world example shown as below. This is a imitation learning setting, where the expert only walking on the yellow grid from the bottom left to the upper right corner. The agent starts from a random grid except the shaded zone. In fact, we can also regard the task from an RL perspective, such that the agent is only rewarded on the grid that the expert experienced. 
+    <br>
+    <center>
+    <img class="exp" width=20% height=auto src="images/grid-settings.png">
+    </center>
+    We learn the state planner using <b>supervised learning (left)</b> and the <b>deoupled policy gradient (right)</b> proposed above, and visualize the learned plan on each state, show in below:
+    <center>
+    <img class="exp" width=20% height=auto src="images/depo-sup.png"> <img class="exp" width=20% height=auto src="images/depg-grid.png">
+    </center>
+    Obviously these are neither we want. Two things can be concluded:
+    (i) For supervised learning, the state planner only predicts the state in the region of expert data.
+    (ii) For deoupled policy gradient, the state planner predicts arbirtuary states.
+    <br>
+    We can easily understand the supervised learning setting, but why the gradient leads to such a weired result?
+  </p>
+
+<div class="sub_header">Train the State Planner - Way 2.2: the Problem of Agnostic Decoupled Policy Gradient</div>
+  <p>
+    We name the problem as <b>agnostic decoupled policy gradient</b>. In fact, the problem comes from a constraint on the inverse dynamics modelling's inputs, which requires the prediction of the target planner to be a legal neighbor state that follows the inputs training data distribution.
+    Otherwise, the state transition pair \((s, s')\) will be an illegal transition and leads the corresponding output actions to be <b>agnostic</b>.
+    <br>
+    An illegal state transition could still be a legal input to the approximated inverse dynamics model if it may still provide a feasible action to interact with the environment.
+    However, since we are utilizing the gradient of the inverse dynamics model \(\nabla_{h}I(a|s,h_\psi(\epsilon;s))\), we do not expect a generalization on illegal transitions to get a feasible action.
+    <br>
+    In other words, simply optimizing \(\psi\) through DePG, we cannot constrain the gradient provided by the inverse dynamics within pointing to a reachable target state, and the state planner will be trained to predict an arbitrary and unreasonable state that can still lead the inverse dynamics model to give a feasible action. 
+  </p>
+<div class="sub_header">Train the State Planner - Way 2.3: Fix Agnostic by CDePG!</div>
+  <p>
+    Let's reconsider what DePG is doing.
+    In principle, the goal of DePO is to learn a planner that determines the high-level target to reach, yet taking which action to achieve is inessential.
+    <br>
+    Therefore, no matter what action $a$ the inverse dynamics takes, as long as it leads the agent from $s$ to $s'$, the integrated policies are all optimal policies on \(s\) and their value \(Q_{\pi}(s,a)\) should be the same. On this condition, give a state-action pair \((s,a)\) and a legal transition $s'$, we can assuming the inverse dynamics as a deterministic distribution on $a$ with the probability of one, i.e., \(s'\) has been achieved by \(I(a|s,s')=1\), then, the probability of the decoupled policy \(\pi(a|s)=h(s'|s)\), where \(s'\) is the target state.
+    $$
+    \nabla_{\psi} \mathcal{L}^\pi = \mathbb{E}_{(s,a,s')\sim\pi}\left [Q(s,a) \nabla_{\psi}\log h_{\psi}(s'|s)\right ]~.
+    $$
+    We name the gradient as Calibrated Decoupled PG (CDePG). Optimizing with CDePG can be realized as maximizing the probability to target state $s'$ on state $s$ if $a$ is a good action regarding the inverse dynamics is accurate.
+  </p>
+  <div class="sub_header">Train the State Planner - Way 2.4: Trade-Off in Exploration-Exploitation</div>
+  <p>
+    However, solely updating CDePG leads to a severe exploration problem since the planner is only allowed to predict a visited state. This is easy to understand. In the form of CDePG, only reached states \(s'\) are used for updating the planner with a specified \(a\), therefore, we cannot raise any novel action to observe novel states. In normal RL with normal state-to-action policy, this is achieved by the reweighting of the Q function. After an training iteration, the Q function updates its value prediction by enhancing some action while cut down the others. The uncertainty at the prediction of the Q function raises many novel actions and can reach many novel states in the online training procedure. And CDePG does not have such a property since its action is determined by the low-level inverse dynamics function.
+    <br>
+    Don't be sad! Remember we have derived DePG, which directly optimized the state planner to give some unknown (may illegal) target states to explore the most promising actions. Thereafter, in practice, we choose to jointly optimize DePG  with CDePG and find it can achieve a good balance between exploration and accurate prediction on legal targets. Happy ending!
+    <br>
+    In our experiment, we also find that even without the weighting term \(Q(s,a)\) in CDePG, we can still realize great results. In this way, CDePG actually can be reilized as a MLE regularizer that constraint the state planner to have legal outputs.
+  </p>
+
+  <div class="header">Experiments: DePO Training and Transferring</div>
+  <p>
+
+    We only cover some main results here. For complete results please refer to the paper. The experiments are designed to show: 1) the learnability of DePO; 2) the transferability of DePO.
+    <br>
+    <b>1. State plan of DePO on the grid setting.</b> 
+    <br>
+    DePO generalizes the planning into every out-of-demonstration state (white blocks) with legal transitions.
+    <br>
+    <img class="exp" width=20% height=auto src="images/depo-grid.png">
+    <br>
+    <b>2. Learning curve on the grid setting.</b> 
+    <br>
+    The first 100 epochs train each algorithm with \(4 \times k (k=1)\) action spaces. After 100 epochs we change \(k=4\), resuting in an action space of \(4\times 4\). All algorithms except DePO requires to retrain from scratch, but DePO only have to train the inverse dynamics model while keep the state planner.
+    <br>
+    <img class="exp" width=50% height=auto src="images/grid-curve.png">
+    <br>
+    <b>3. Learning from scratch on Mujoco envs. Imitation task (no reward, only demos).</b> 
+    <br>
+    <img class="exp" width=100% height=auto src="images/mujoco_curves.png">
+    <br>
+    <b>4. Transfer learning on Mujoco envs. Imitation baselines.</b> 
+    <br>
+    The transfer setting can be further refered to the paper.
+    <br>
+    <img class="exp" width=100% height=auto src="images/mujoco_transfer.png">
+    <br>
+    <b>5. Learning from scratch on Mujoco envs. Reinforcement learning task (learn with rewards).</b> 
+    <br>
+    Pred-Real MSE denotes the averaged difference between the predicted states and the achieved one, showing that the agent can really achieve where it plans with DePO.
+    <br>
+    <img class="exp" width=80% height=auto src="images/rl_curve.png">
+    <br>
+    <b>6. Transfer learning on Mujoco envs. Reinforcement learning baseline (SAC).</b> 
+    <br>
+    Pre-training and transfer the state planner results in rather efficient training! Even beat SAC a lot!
+    <img class="exp" width=80% height=auto src="images/rl_transfer.png">
+    <br>
+
+    See more interesting experimental results in our <a href="https://arxiv.org/abs/2203.02214">paper</a>!
+
+    
+
+  </p>
+
+<!-- <div class="container">
+  <iframe
+    src="https://www.youtube.com/embed/Xl_r28qDUEg"
+    srcdoc="<style>*{padding:0;margin:0;overflow:hidden}html,body{height:100%}img,span{position:absolute;width:100%;top:0;bottom:0;margin:auto}span{height:1.5em;text-align:center;font:48px/1.5 sans-serif;color:white;text-shadow:0 0 0.5em black}</style><a href=https://www.youtube.com/embed/rdF7q8MipRs?autoplay=1><img src='images/youtube_mbpo.webp' alt='MBPO video'></a>"
+    frameborder="0"
+    allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen
+    loading="lazy"
+    title="MBPO video"
+  ></iframe>
+</div>
+
+<p>
+  If you cannot access YouTube, please <a href="images/mbpo_icml_2019.mp4">download our video here</a>.
+</p>
+<br> -->
+<center></center>
+</center>
+
+<br>
+<br>
+<br>
+<br>
+
+<div style="float:right;">
+  The project page highly refers to <a href="https://jannerm.github.io/mbpo-www/"> Michael's work</a>
+</div>
+
+</body>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</html>

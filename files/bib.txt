@@ -1,0 +1,6 @@
+@inproceedings{liu2022plan,
+  title = {Plan Your Target and Learn Your Skills: Transferable State-Only Imitation Learning via Decoupled Policy Optimization},
+  author = {Liu, Minghuan and Zhu, Zhengbang and Zhuang, Yuzheng and Zhang, Weinan and Hao, Jianye and Yu, Yong and Wang, Jun},
+  booktitle = {International Conference on Machine Learning},
+  year = {2022}
+}
