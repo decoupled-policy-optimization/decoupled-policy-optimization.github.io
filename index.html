@@ -48,6 +48,21 @@
 </center>
 <br>
 
+<center>
+  <b><font size="4">Predicted States by State Planner</font></b><br>
+  <video width=80% height=auto autoplay playsinline muted>
+    <source src="images/concat_pred.mp4" type="video/mp4">
+  </video><br>
+  <b><font size="4">Achieved States</font></b><br>
+  <video width=80% height=auto autoplay playsinline muted>
+    <source src="images/concat_real.mp4" type="video/mp4">
+  </video>
+  <br>
+  <i>Long-horizon predictions of the state planner learned by DePO compared to real achieved states.</i>
+  </center>
+  <p>
+  <br><br>
+
 <div class="header">Summary</div>
 <p>
   We propose a decouple policy structure and corresponding optimization method named Decoupled Policy Optimization (DePO). DePO explicitly decouples the policy as a high-level state planner and an inverse dynamics model, enables knowledge transfer and generalize the planner to different action spaces or state transition dynamics. Our experiments apply DePO in state-only imitation learning problems and reinforcement learning tasks, showing the effectiveness of DePO on learning a generalized state planner while achieving the best imitation performance, and can be transferred to train agents with different action spaces and action dynamics with much higher efficiency. We demonstrate the appealing usage of DePO for transferring across different tasks by pre-training, and the potential for co-training agents with various skills.
