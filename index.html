@@ -121,7 +121,7 @@ The only way to train the inverse dynamics model is supervised learning from age
 
   $$\min_{\psi}L^{h} = \mathbb{E}_{(s,s')\sim E}[\fd( h_{E}(s'|s)\| h_{\psi}(s'|s))]~.$$
 
-  However, it is well known that simply supervised learning in imitation learning can cause compouding error problem, and also, we should consider how to optimize when we have no access to expert demonstrations. Therefore, we should derive a way to utilizing <b>rewards</b>.
+  However, it is well known that only direct supervised learning in imitation learning can cause compouding error problem, and also, we should consider how to optimize when we have no access to expert demonstrations. Therefore, we should derive a way to utilizing <b>rewards</b>.
   </p>
 
 <div class="sub_header">Train the State Planner - Way 2: Decoupled Policy Gradient using Rewards</div>
@@ -140,7 +140,7 @@ The only way to train the inverse dynamics model is supervised learning from age
     \end{eqnarray}
   $$
   This simply expands the policy gradient into the decoupled function. 
-  For simplicity, we can also rewrite the deoupled policy with the reparameterization trick and bypass explicitly computing the integral over $s'$, as:
+  For simplicity, we can also rewrite the deoupled policy with the reparameterization trick and bypass explicitly computing the integral over \(s'\), as:
   $$
   s' = h(\epsilon;s), ~~
       \pi(a|s)=\mathbb{E}_{\epsilon\sim \mathcal{N}}\left [ I(a|s,h(\epsilon;s)) \right ]~,
@@ -191,11 +191,11 @@ The only way to train the inverse dynamics model is supervised learning from age
     Let's reconsider what DePG is doing.
     In principle, the goal of DePO is to learn a planner that determines the high-level target to reach, yet taking which action to achieve is inessential.
     <br>
-    Therefore, no matter what action $a$ the inverse dynamics takes, as long as it leads the agent from $s$ to $s'$, the integrated policies are all optimal policies on \(s\) and their value \(Q_{\pi}(s,a)\) should be the same. On this condition, give a state-action pair \((s,a)\) and a legal transition $s'$, we can assuming the inverse dynamics as a deterministic distribution on $a$ with the probability of one, i.e., \(s'\) has been achieved by \(I(a|s,s')=1\), then, the probability of the decoupled policy \(\pi(a|s)=h(s'|s)\), where \(s'\) is the target state.
+    Therefore, no matter what action \(a\) the inverse dynamics takes, as long as it leads the agent from \(s\) to \(s'\), the integrated policies are all optimal policies on \(s\) and their value \(Q_{\pi}(s,a)\) should be the same. On this condition, give a state-action pair \((s,a)\) and a legal transition \(s'\), we can assuming the inverse dynamics as a deterministic distribution on \(a\) with the probability of one, i.e., \(s'\) has been achieved by \(I(a|s,s')=1\), then, the probability of the decoupled policy \(\pi(a|s)=h(s'|s)\), where \(s'\) is the target state.
     $$
     \nabla_{\psi} \mathcal{L}^\pi = \mathbb{E}_{(s,a,s')\sim\pi}\left [Q(s,a) \nabla_{\psi}\log h_{\psi}(s'|s)\right ]~.
     $$
-    We name the gradient as Calibrated Decoupled PG (CDePG). Optimizing with CDePG can be realized as maximizing the probability to target state $s'$ on state $s$ if $a$ is a good action regarding the inverse dynamics is accurate.
+    We name the gradient as Calibrated Decoupled PG (CDePG). Optimizing with CDePG can be realized as maximizing the probability to target state \(s'\) on state \(s\) if \(a\) is a good action regarding the inverse dynamics is accurate.
   </p>
   <div class="sub_header">Train the State Planner - Way 2.4: Trade-Off in Exploration-Exploitation</div>
   <p>
